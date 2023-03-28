@@ -80,6 +80,9 @@ class Node:
         self.fn = hn + gn
         self.moves = moves
         self.prevM = []
+        self.prevGns = []
+    def getPrevGns(self): return self.prevGns
+    def appendGn(self, g): self.prevGns.append(g)
     def getPrevMoves(self): return self.prevM
     def appendSolStep(self, m):
         self.prevM.append(m)
@@ -282,6 +285,7 @@ def expand(Node, repeatStates):
                 c = newNode.swap(n, x1, y1)
                 newNode.calcHn()
                 newNode.appendSolStep(Node.getmatrix())
+                newNode.appendGn(Node.getGn())
                 newNode.setGn(Node.getGn() + c)
                 newNode.updateFn()
                 newNode.addMove('Move container ' + n.getName() + ' from ' + n.getX() + ',' + n.getY() + ' to ' + str("{:02d}".format(x1 + 1)) + ',' + str("{:02d}".format(y1 + 1)))
@@ -329,7 +333,7 @@ def search(): # can only have 1 manifest / ship at once - so no need for paramet
     while(1):
         # no solution and no nodes left, search failed...
         if (nodes.empty()):
-            print('fAILED')
+            print('Failed, need to use SIFT')
             return "failed" # use SIFT
 
         # pop current node off PQ

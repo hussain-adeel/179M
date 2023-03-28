@@ -25,9 +25,8 @@ def comment():
 
 
 def openBalanceMenu(filename): # also used https://www.geeksforgeeks.org/open-a-new-window-with-a-button-in-python-tkinter/
-    global commentBox, solNode, lblp, lblt, startGrid
+    global commentBox, solNode, lblp, lblt, startGrid, lbl5, movesLeft, totalMoves, timeLeft, lbl6
     global name, lbl4, moves, nextBtn, newWindow, move
-
     moveNumber = 1
     newWindow = Toplevel(window) 
     newWindow.title("New Window")
@@ -39,8 +38,6 @@ def openBalanceMenu(filename): # also used https://www.geeksforgeeks.org/open-a-
     commentBtn = Button(newWindow, text="Submit", command=comment)
     commentBtn.grid(column=3, row=0)
     move = "Started Balancing"
-    nextBtn = Button(newWindow, text='Start',command=doNextMove)
-    nextBtn.grid(column=2, row=12)
     lbl2 = Label(newWindow, text="Type comment in box and hit submit to leave comment in log\nTo Log in new user, use secondary window text box and hit \'Log In\'")
     lbl2.grid(column=1, row=4)
     # A Label widget to show in toplevel
@@ -49,26 +46,38 @@ def openBalanceMenu(filename): # also used https://www.geeksforgeeks.org/open-a-
     lbl4 = Label(newWindow, text="Hit Start to Begin")
     lbl4.grid(row=12, column=0)
     solNode = search()
+    moves = solNode.getMoves()
     solNode.appendSolStep(solNode.getmatrix())
     solNode.appendSolStep(solNode.getmatrix())
     startGrid = solNode.getPrevMoves().pop(0)
-    print('--------------------------------- INITAL PROBLEM --------------------------------')
     s = ''
     for y in range(8)[::-1]:
         for x in range(12):
             s += (str(startGrid[x][y].getName().center(16, ' ')))
         s += '\n'
+    movesLeft = len(moves)
     n = "AFTER MOVE:\n"
     lblt = Label(newWindow, text=n+s)
     lblt.grid(row=24, column=1)
     a = "CURRENT STATE:\n"
     lblp = Label(newWindow, text=a+s)
     lblp.grid(row=36, column=1)
-    moves = solNode.getMoves()
+
+    totalMoves = len(moves)
     moves.append('COMPLETED!')
+    movesLeft = len(moves) - 1
+    lbl5 = Label(newWindow, text=str(movesLeft) + ' of ' + str(totalMoves) + ' remainig.')
+    lbl5.grid(row=42, column=1)
+    timeLeft = solNode.getGn()
+
+    lbl6 = Label(newWindow, text='Estimated Time Remaining: ' + str(timeLeft) + ' minutes')
+    lbl6.grid(row=46, column=1)
+    nextBtn = Button(newWindow, text='Start',command=doNextMove)
+    nextBtn.grid(column=2, row=12)
+
 
 def doNextMove():
-    global lbl4, moves, nextBtn, move, lblp, lblt, startGrid
+    global lbl4, moves, nextBtn, move, lblp, lblt, startGrid, movesLeft, lbl5, timeLeft, lbl6
     logComment(move)
     s = ''
     for y in range(8)[::-1]:
@@ -77,6 +86,12 @@ def doNextMove():
         s += '\n'
     lblp['text'] = "CURRENT STATE\n" + s
     startGrid = solNode.getPrevMoves().pop(0)
+    if solNode.getPrevGns():
+        t = solNode.getPrevGns().pop(0)
+        timeLeft = timeLeft - t
+    else:
+        timeLeft = 0
+    lbl6['text'] = 'Estimated Time Remaining: ' + str(timeLeft) + ' minutes'
     s = ''
     for y in range(8)[::-1]:
         for x in range(12):
@@ -84,6 +99,10 @@ def doNextMove():
         s += '\n'
     lblt['text'] = "AFTER MOVE:\n" + s
     move = moves.pop(0)
+    if movesLeft != 0:
+        movesLeft = movesLeft - 1
+    sx = str(movesLeft) + ' of ' + str(totalMoves) + ' remainig.'
+    lbl5['text'] = sx
     if not moves:
         nextBtn['text'] = 'FINISH'
         nextBtn['command'] = exit
