@@ -2,6 +2,8 @@ import queue # TO ACCESS PRIORITY QUEUEname
 import time # TO CALCULATE AMNT OF TIME PROGRAM TAKES
 import copy # TO DEEP COPY LISTS OF LISTS (cannot lose values)
 
+from log import logComment
+
 # TO DO: MAKE GUI
 # def mainMenu():
 #     menu = True
@@ -20,6 +22,8 @@ class Container:
     def getName(self): return self.name
     def getX(self): return self.x
     def getY(self): return self.y
+    def setX(self, x): self.x = x
+    def setY(self, y): self.y = y
     def getWeight(self): return self.weight
     def __lt__(self, compare):
         if (self.weight == compare.getWeight()): return True
@@ -41,6 +45,7 @@ class Ship:
         for x in self.containers:
             matrix[int(x.getX()) - 1][int(x.getY()) - 1] = x
         return matrix
+    def setmatrix(self, m): self.matrix = m
 
 def readManifest(filepath):
     global currShip
@@ -61,7 +66,7 @@ def readManifest(filepath):
     filename = filepath.strip(".txt")
     log = 'Manifest ' + filename + ' opened, ' + str(numContainers) + ' containers loaded'
     currShip = Ship(numContainers, containers)
-    print(log)
+    logComment(log)
 
 # Idea and some code taken from group member's CS 170 Porject 1 submision
 # https://github.com/hussain-adeel/170p1
@@ -69,10 +74,21 @@ def readManifest(filepath):
 class Node:
     def __init__(self, matrix, moves, hn, gn):
         self.matrix = matrix
+        self.weightMatrix = self.getWeightMatrix()
         self.hn = hn
         self.gn = gn # num moves so far
         self.fn = hn + gn
         self.moves = moves
+        self.prevM = []
+    def getPrevMoves(self): return self.prevM
+    def appendSolStep(self, m):
+        self.prevM.append(m)
+    def getWeightMatrix(self):
+        weightMatrix = [[0 for row in range(8)] for cols in range(12)]
+        for x in self.getmatrix():
+            for c in x:
+                weightMatrix[int(c.getX()) - 1][int(c.getY()) - 1] = c.getWeight()
+        return weightMatrix
     def getMoves(self):
         return self.moves # moves taken to get to this state (in str format)
     def addMove(self, s):
@@ -102,7 +118,7 @@ class Node:
         return weight
     def getRightWeight(self):
         weight = 0
-        for x in range(6, 11):
+        for x in range(6, 12):
             for y in range(8):
                 if self.getmatrix()[x][y].getWeight() != -1: weight += self.getmatrix()[x][y].getWeight()
         return weight
@@ -111,7 +127,7 @@ class Node:
     def checkBalance(self):
         rw = self.getRightWeight()
         lw = self.getLeftWeight()
-        print(lw)
+        #print(lw)
         if lw == 0 and rw == 0:
             return True
         else:
@@ -123,7 +139,34 @@ class Node:
             for x in range(12):
                 print(str(self.getmatrix()[x][y].getWeight()).center(12), end='')
             print('')
+    def printW(self):
+        # TESTING PURPOSES ONLY
+        for y in range(8)[::-1]:
+            for x in range(12):
+                print(str(self.weightMatrix[x][y]).center(12), end='')
+            print('')
     def findValidSpaces(self, side):
+        #pass in lighter side...
+        spaces = []
+        skip = False
+        if side == 'left':
+            for x in range(6)[::-1]:
+                for y in range(8):
+                    if self.matrix[x][y].getName() == 'UNUSED' and not skip:
+                        spaces.append(x)
+                        spaces.append(y)
+                        skip = True
+                skip = False
+        if side == 'right':
+            for x in range(6, 12):
+                for y in range(8):
+                    if self.matrix[x][y].getName() == 'UNUSED' and not skip:
+                        spaces.append(x)
+                        spaces.append(y)
+                        skip = True
+                skip = False
+        return spaces
+    def findValidSpace(self, side):
         #pass in lighter side...
         if side == 'left':
             for x in range(6)[::-1]:
@@ -134,7 +177,7 @@ class Node:
             for x in range(6, 11):
                 for y in range(0, 11):
                     if self.matrix[x][y].getName() == 'UNUSED':
-                        return x, y
+                        return x,y
     # this is used by the priority queue to determine how to order these nodes
     def __lt__(self, compare):
         if (self.fn == compare.getFn()): return self.gn < compare.getGn()
@@ -164,29 +207,29 @@ class Node:
             x = weightQ.get()
             xw = x.getWeight()
             otherWeight = min(lw, rw)
-            if xw <= deficit + (deficit * 0.10): #within 10% since that is the constraint of our balance
+            if xw <= deficit:
                 otherWeight += xw
 
                 numCMoved = numCMoved + 1
                 if lw > rw:
-                    x1, y1 = self.findValidSpaces('right')
+                    x1, y1 = self.findValidSpace('right')
                 else:
-                    x1, y1 = self.findValidSpaces('left')
+                    x1, y1 = self.findValidSpace('left')
                 distTravel = distTravel + calcDistance(int(x.getX()) - 1, int(x.getY()) - 1, x1, y1)
             if (otherWeight / (max(lw, rw) - otherWeight) >= 0.9):
                 return numCMoved + distTravel
-        return -1
+        #print(-1)
+        return numCMoved + distTravel
     
     def swap(self, c, x1, y1):
         matrix = self.getmatrix()
-        print(x1)
-        print('req: ' + str(c.getWeight()))
         x = int(c.getX()) - 1
         y = int(c.getY()) - 1
+        newC = Container(c.getWeight(), c.getName(), str(x1 + 1), str(y1 + 1))
+
 
         emptyContainer = Container(0, 'UNUSED', x, y)
-        
-        matrix[x1][y1] = c
+        matrix[x1][y1] = newC
         matrix[x][y] = emptyContainer
         self.updatematrix(matrix)
 
@@ -211,6 +254,7 @@ def expand(Node, repeatStates):
                 elif cn.getName() == 'UNUSED': continue
                 else:
                     nodes_to_expand.append(cn)
+                    #print('found node l: ' + cn.getName() + ' ' + cn.getX() + ' ' + cn.getY())
                     break
     else: # right side heavier
         for x in range(6, 12):
@@ -221,33 +265,45 @@ def expand(Node, repeatStates):
                 elif cn.getName() == 'UNUSED': continue
                 else:
                     nodes_to_expand.append(cn)
+                    #print('found node r: ' + cn.getName() + ' ' + cn.getX() + ' ' + cn.getY())
                     break
     
     nodes_return = []
 
     for n in nodes_to_expand: 
-        print('//' + str(n.getWeight()))
         if lw > rw:
-            x1, y1 = Node.findValidSpaces('right')
-            newNode = copy.deepcopy(Node)
-            c = newNode.swap(n, x1, y1)
-            newNode.calcHn()
-            newNode.setGn(c)
-            newNode.updateFn()
-            newNode.addMove('Move container ' + n.getName() + ' from ' + n.getX() + ',' + n.getY() + ' to ' + str(x1 + 1) + ',' + str(y1 + 1))
-            newNode.print()
-            if repeatStates.get(tuple(tuple(s) for s in newNode.getmatrix())) != 'R':
-                nodes_return.append(newNode)
+            spaces = Node.findValidSpaces('right')
+            while (spaces):
+                newNode = copy.deepcopy(Node)
+                x1 = spaces.pop(0)
+                y1 = spaces.pop(0)
+                if (x1 == int(n.getX()) -1 and y1 == int(n.getY())):
+                    continue
+                c = newNode.swap(n, x1, y1)
+                newNode.calcHn()
+                newNode.appendSolStep(Node.getmatrix())
+                newNode.setGn(Node.getGn() + c)
+                newNode.updateFn()
+                newNode.addMove('Move container ' + n.getName() + ' from ' + n.getX() + ',' + n.getY() + ' to ' + str("{:02d}".format(x1 + 1)) + ',' + str("{:02d}".format(y1 + 1)))
+                if repeatStates.get(tuple(tuple(s) for s in newNode.getWeightMatrix())) != 'R':
+                    nodes_return.append(newNode)
         else:
-            x1, y1 = Node.findValidSpaces('left')
-            newNode = copy.deepcopy(Node)
-            c = newNode.swap(n, x1, y1)
-            newNode.calcHn()
-            newNode.setGn(c)
-            newNode.updateFn()
-            newNode.addMove('Move container ' + n.getName() + ' from ' + n.getX() + ',' + n.getY() + ' to ' + str(x1 + 1) + ',' + str(y1 + 1))
-            if repeatStates.get(tuple(tuple(s) for s in newNode.getmatrix())) != 'R':
-                nodes_return.append(newNode)
+            spaces = Node.findValidSpaces('right')
+            while (spaces):
+                newNode = copy.deepcopy(Node)
+                x1 = spaces.pop(0)
+                y1 = spaces.pop(0)
+                if (x1 == int(n.getX())-1 and y1 == int(n.getY())):
+                    #print('skipped')
+                    continue
+                c = newNode.swap(n, x1, y1)
+                newNode.appendSolStep(Node.getmatrix())
+                newNode.calcHn()
+                newNode.setGn(Node.getGn() + c)
+                newNode.updateFn()
+                newNode.addMove('Move container ' + n.getName() + ' from ' + n.getX() + ',' + n.getY() + ' to ' + str(x1 + 1) + ',' + str(y1 + 1))
+                if repeatStates.get(tuple(tuple(s) for s in newNode.getWeightMatrix())) != 'R':
+                    nodes_return.append(newNode)
     return nodes_return
 
 def m(nodes, moves):
@@ -257,19 +313,24 @@ def m(nodes, moves):
     
     return new_nodes
 
-def search(matrix):
+
+
+def search(): # can only have 1 manifest / ship at once - so no need for parameter when alr global var
+
     nodes = queue.PriorityQueue()
     repeatStates = {}
 
     initalNode = Node(currShip.getmatrix(), [], Node(currShip.getmatrix(), [], 0, 0).calcHn(), 0)
     nodes.put(initalNode)
 
-    stateTuple = tuple(tuple(s) for s in initalNode.getmatrix())
+    stateTuple = tuple(tuple(s) for s in initalNode.getWeightMatrix())
     repeatStates[stateTuple] = "R"
 
     while(1):
         # no solution and no nodes left, search failed...
-        if (nodes.empty()): return "failed" # use SIFT
+        if (nodes.empty()):
+            print('fAILED')
+            return "failed" # use SIFT
 
         # pop current node off PQ
         currNode = nodes.get()
@@ -282,13 +343,14 @@ def search(matrix):
             print("\n!!! REACHED GOAL STATE !!!")
             print("----------------")
             currNode.print()
-
+            currShip.setmatrix(currNode.getmatrix())
+            print('minutes taken: ' + str(currNode.getGn()))
             for x in currNode.getMoves(): print(x)
-            return "success"
+            return currNode
         
         
         # If not goal, then we need to expand it
-        #print("The best state to expand with a g(n) = " + str(currNode.getGn()) + " and h(n) = " + str(currNode.getHn()) + " is...")
+        print("The best state to expand with a g(n) = " + str(currNode.getGn()) + " and h(n) = " + str(currNode.getHn()) + " is...")
         currNode.print()
         
         # EXPAND to find new moves (need to do this sep. becasuse of how my repeat check works)
@@ -296,17 +358,8 @@ def search(matrix):
         
         # Need to sure no repeats of moves we already found through expanding
         for n in new_nodes:
-            t = tuple(tuple(x) for x in n.getmatrix())
+            t = tuple(tuple(x) for x in n.getWeightMatrix())
             repeatStates[t] = 'R'
         
         # Use queueing function selected to order PQ to better come up with solution
         nodes = m(nodes, new_nodes)
-
-
-readManifest("ShipCase5.txt")
-testNode = Node(currShip.getmatrix(), [], 0, 0)
-
-testNode.print()
-#print(testNode.getmatrix()[11][7].getWeight())
-search(currShip.getmatrix())
-testNode.print()
